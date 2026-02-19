@@ -37,7 +37,7 @@ impl NeuralNetwork {
         }
 
         //Скрытые веса.
-        for i in 1..=self.hidden_layers {
+        for i in 1..self.hidden_layers {
             self.weights.push(Vec::new());
 
             for j in 0..self.hidden_neurons {
@@ -51,11 +51,11 @@ impl NeuralNetwork {
 
         //Выходные веса.
         self.weights.push(Vec::new());
-        for i in 0..self.output_neurons {
-            self.weights[self.hidden_layers + 1].push(Vec::new());
+        for i in 0..self.hidden_neurons {
+            self.weights[self.hidden_layers].push(Vec::new());
 
-            for _j in 0..self.hidden_neurons {
-                self.weights[self.hidden_layers + 1][i].push(0.1); //rng.random_range(-0.5..=0.5)
+            for _j in 0..self.output_neurons {
+                self.weights[self.hidden_layers][i].push(0.1); //rng.random_range(-0.5..=0.5)
             }
         }
 
@@ -78,10 +78,28 @@ impl NeuralNetwork {
             self.biases[self.hidden_layers].push(0.0);
         }
     }
-    fn predict(&self, data: (Vec<f32>, u8)) {
+
+    //Супер неоптимизированная залупа.
+    fn predict(&self, data: (Vec<f32>, u8)) -> Vec<Vec<f32>> {
         //TODO Push forward algorythm!
 
         let mut all_neurons: Vec<Vec<f32>> = vec![data.0];
+
+        for i in 0..=self.hidden_layers {
+            all_neurons.push(Vec::new());
+            for j in 0..self.biases[i].iter().len() {
+                // нейрон в слое l
+                let mut neuron: f32 = self.biases[i][j];
+                // мы должны взять все веса предыдущего слоя с индексом j(это индекс текущего нейрона)
+                for k in 0..self.weights[i].iter().len() {
+                    neuron += self.weights[i][k][j] * all_neurons[i][k];
+                }
+                all_neurons[i + 1].push(sigm(neuron));
+            }
+        }
+
+        println!("push forward:{:?}", all_neurons);
+        all_neurons
     }
 }
 
@@ -105,7 +123,32 @@ fn main() {
     };
 
     net1.create();
-    println!("{:?}", net1.weights);
+
+    let right_push_forward: Vec<Vec<f32>> = vec![
+        vec![1.0, 0.234, 0.943],
+        vec![0.55421107, 0.55421107],
+        vec![0.52768222, 0.52768222],
+        vec![0.52635965, 0.52635965, 0.52635965],
+    ];
+
+    println!(
+        "кол-во входных нейронов: {},
+        кол-во выходных нейронов: {},
+        кол-во скрытых слоев: {},
+        кол-во скрытых нейронов в каждом слое: {},
+        функция активации - sigmoida,
+        входные нейроны: [1.0, 0.234, 0.943]
+        ====================================",
+        net1.input_neurons, net1.output_neurons, net1.hidden_layers, net1.hidden_neurons
+    );
+
+    println!("веса: {:?}", net1.weights);
     println!();
-    //net1.predict((vec![1.0, 0.234, 0.943], 4));
+    println!("смещения: {:?}", net1.biases);
+    println!();
+
+    println!("Проверка:    {:?}", right_push_forward);
+    net1.predict((vec![1.0, 0.234, 0.943], 4));
+
+    println!()
 }
