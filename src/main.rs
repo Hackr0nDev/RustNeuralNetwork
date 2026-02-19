@@ -1,4 +1,4 @@
-use rand::RngExt;
+use rand::{rng, RngExt};
 use std::f32::consts::E;
 mod data;
 use data::{load_mnist_csv, Sample};
@@ -32,7 +32,7 @@ impl NeuralNetwork {
             self.weights[0].push(Vec::new());
 
             for _j in 0..self.hidden_neurons {
-                self.weights[0][i].push(0.1); //rng
+                self.weights[0][i].push(rng.random_range(-0.5..=0.5));
             }
         }
 
@@ -44,7 +44,7 @@ impl NeuralNetwork {
                 self.weights[i].push(Vec::new());
 
                 for _k in 0..self.hidden_neurons {
-                    self.weights[i][j].push(0.1); //rng
+                    self.weights[i][j].push(rng.random_range(-0.5..=0.5));
                 }
             }
         }
@@ -55,7 +55,7 @@ impl NeuralNetwork {
             self.weights[self.hidden_layers].push(Vec::new());
 
             for _j in 0..self.output_neurons {
-                self.weights[self.hidden_layers][i].push(0.1); //rng.random_range(-0.5..=0.5)
+                self.weights[self.hidden_layers][i].push(rng.random_range(-0.5..=0.5));
             }
         }
 
@@ -97,8 +97,11 @@ impl NeuralNetwork {
                 all_neurons[i + 1].push(sigm(neuron));
             }
         }
+        let v_output = all_neurons.iter().last().unwrap();
+        println!("Выходной слой нейронов: {:?}", v_output);
+        println!();
+        println!("Cost function: {}", f_cost(v_output.to_vec(), data.1));
 
-        println!("push forward:{:?}", all_neurons);
         all_neurons
     }
 }
@@ -107,13 +110,31 @@ fn sigm(z: f32) -> f32 {
     1.0 / (1.0 + E.powf(-z))
 }
 
+fn f_cost(output_vec: Vec<f32>, answ: u8) -> f32 {
+    let mut c: f32 = 0.0;
+
+    for i in 0..10 {
+        if i != answ {
+            c += output_vec[i as usize] * output_vec[i as usize];
+        } else {
+            c += (1.0 - output_vec[i as usize]) * (1.0 - output_vec[i as usize]);
+        }
+    }
+    c / 2.0
+}
+
 fn main() {
+    let mut train_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_train.csv", true)
+        .expect("Наебнулось что то в train_full");
+    let test_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_test.csv", false)
+        .expect("Наебнулось что то в train_full");
+
     let mut net1 = NeuralNetwork {
-        input_neurons: 3,
-        output_neurons: 3,
+        input_neurons: 784,
+        output_neurons: 10,
 
         hidden_layers: 2,
-        hidden_neurons: 2,
+        hidden_neurons: 16,
 
         learning_rate: 0.01,
         mini_batch_size: 100,
@@ -124,31 +145,24 @@ fn main() {
 
     net1.create();
 
-    let right_push_forward: Vec<Vec<f32>> = vec![
-        vec![1.0, 0.234, 0.943],
-        vec![0.55421107, 0.55421107],
-        vec![0.52768222, 0.52768222],
-        vec![0.52635965, 0.52635965, 0.52635965],
-    ];
+    //println!(
+    //    "кол-во входных нейронов: {},
+    //    кол-во выходных нейронов: {},
+    //    кол-во скрытых слоев: {},
+    //    кол-во скрытых нейронов в каждом слое: {},
+    //    функция активации - sigmoida,
+    //    ====================================",
+    //    net1.input_neurons, net1.output_neurons, net1.hidden_layers, net1.hidden_neurons
+    //);
+    //
+    ////println!("веса: {:?}", net1.weights);
+    ////println!();
+    ////println!("смещения: {:?}", net1.biases);
+    ////println!();
+    //let mut inp_vec: Vec<f32> = vec![];
+    //for _i in 0..net1.input_neurons {
+    //    inp_vec.push(rng().random_range(0.0..=1.0));
+    //}
 
-    println!(
-        "кол-во входных нейронов: {},
-        кол-во выходных нейронов: {},
-        кол-во скрытых слоев: {},
-        кол-во скрытых нейронов в каждом слое: {},
-        функция активации - sigmoida,
-        входные нейроны: [1.0, 0.234, 0.943]
-        ====================================",
-        net1.input_neurons, net1.output_neurons, net1.hidden_layers, net1.hidden_neurons
-    );
-
-    println!("веса: {:?}", net1.weights);
-    println!();
-    println!("смещения: {:?}", net1.biases);
-    println!();
-
-    println!("Проверка:    {:?}", right_push_forward);
-    net1.predict((vec![1.0, 0.234, 0.943], 4));
-
-    println!()
+    net1.predict(train_full[0].clone());
 }

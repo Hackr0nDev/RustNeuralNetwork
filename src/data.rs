@@ -10,10 +10,6 @@ use std::path::Path;
 
 pub type Sample = (Vec<f32>, u8);
 
-/// Загрузить MNIST CSV формата: label,1x1..28x28
-/// - пиксели -> f32 и нормализуются в [0;1]
-/// - битые строки пропускаются
-/// - shuffle опционально
 pub fn load_mnist_csv<P: AsRef<Path>>(
     path: P,
     shuffle: bool,
@@ -41,8 +37,7 @@ pub fn load_mnist_csv<P: AsRef<Path>>(
             continue;
         }
 
-        // label
-        let y: u8 = match record[0].trim().parse::<u8>() {
+        let label: u8 = match record[0].trim().parse() {
             Ok(v) if v <= 9 => v,
             _ => {
                 skipped += 1;
@@ -50,46 +45,37 @@ pub fn load_mnist_csv<P: AsRef<Path>>(
             }
         };
 
-        // pixels
-        let mut x: Vec<f32> = Vec::with_capacity(784);
+        let mut pixels = Vec::with_capacity(784);
         let mut ok = true;
 
         for i in 1..785 {
-            let p: u16 = match record[i].trim().parse::<u16>() {
+            let p: u16 = match record[i].trim().parse() {
                 Ok(v) if v <= 255 => v,
                 _ => {
                     ok = false;
                     break;
                 }
             };
-            x.push((p as f32) / 255.0);
+            pixels.push(p as f32 / 255.0);
         }
 
-        if ok && x.len() == 784 {
-            data.push((x, y));
+        if ok && pixels.len() == 784 {
+            data.push((pixels, label));
         } else {
             skipped += 1;
         }
     }
 
     if shuffle {
-        let mut rng = rand::rng(); // rand latest
+        let mut rng = rand::rng(); // 🔥 НОВЫЙ API
         data.shuffle(&mut rng);
     }
 
-    eprintln!("[data] loaded={}, skipped={}", data.len(), skipped);
+    eprintln!(
+        "[data] loaded samples: {}, skipped rows: {}",
+        data.len(),
+        skipped
+    );
+
     Ok(data)
-}
-
-/// Утилита: перетасовать уже загруженный датасет
-pub fn shuffle_in_place(data: &mut [Sample]) {
-    let mut rng = rand::rng();
-    data.shuffle(&mut rng);
-}
-
-/// Утилита: split по доле train (например 0.9)
-pub fn split<'a>(data: &'a [Sample], train_frac: f32) -> (&'a [Sample], &'a [Sample]) {
-    let frac = train_frac.clamp(0.0, 1.0);
-    let split_idx = (data.len() as f32 * frac) as usize;
-    data.split_at(split_idx)
 }
