@@ -1,0 +1,5 @@
+/target
+
+# datasets
+MNIST/*.csv
+MNIST.zip

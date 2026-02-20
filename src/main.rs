@@ -120,24 +120,35 @@ impl NeuralNetwork {
             }
         }
 
-        //      ВЕЛИКАЯ ПРОБЛЕММА: НАХУЯ Я КАЖДЫЙ РАЗ ПЕРЕСОЗДАЮ ГРАДИЕНТ????
-        //      ГРАДИЕНТ W,B ДОЛЖНЫ ПЕРЕДАВАТЬСЯ(СОЗДАВАТЬСЯ) В НАЧАЛЕ МИНИБАТЧА.
+        //TODO у нас есть δ^L, с помощью него мы должны заполнить grad_w, grad_b этого слоя.
 
-        //TODO работаем с δ^L
-
-        grad_w.push(Vec::new()); // Добавили СЛОЙ
-        grad_b.push(Vec::new());
+        let n = all_neurons.len();
         for i in 0..gradient.len() {
-            grad_w[i].push(Vec::new());
-            for j in 0..all_neurons[all_neurons.len() - 2].len() {
-                grad_w[i][j].push(gradient[i] * all_neurons[all_neurons.len() - 2][j]);
+            for j in 0..all_neurons[n - 2].len() {
+                grad_w[self.weights.len() - 1][i][j] += gradient[i] * all_neurons[n - 1][j];
+                // ДАЙ БОГ Я ТУТ НЕ
+                // НАХУЕВЕРТИЛ С ИНДЕКСАМИ
             }
-            grad_b[i].push(gradient[i]);
+            grad_b[self.biases.len() - 1][i] += gradient[i];
+        }
+
+        //TODO разработать все остальное (δ^l)
+        for i in (1..n - 1).rev() {
+            //слои
+
+            //Проходимся по сдвигам (нероны)
+            for j in 0..self.biases[i - 1].len() {
+                let guilt_l_j = c / self.biases[i - 1][j];
+                grad_b[i - 1][j] += guilt_l_j;
+                for k in 0..self.weights[i - 1][j].len() {
+                    grad_w[i - 1][j][k] += guilt_l_j * all_neurons[i - 1][j];
+                }
+            }
         }
     }
 
     fn train(&self) {
-        let mut train_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_train.csv", true)
+        let mut train_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_train.csv", false)
             .expect("Наебнулось что то в train_full");
         //let _test_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_test.csv", false)
         //    .expect("Наебнулось что то в train_full");
