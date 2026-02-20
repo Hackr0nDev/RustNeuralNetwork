@@ -29,7 +29,7 @@ impl NeuralNetwork {
             self.weights[0].push(Vec::new());
 
             for _j in 0..self.input_neurons {
-                self.weights[0][i].push(rng.random_range(-0.5..=0.5));
+                self.weights[0][i].push(rng.random_range(-0.0866..=0.0866));
             }
         }
 
@@ -41,7 +41,7 @@ impl NeuralNetwork {
                 self.weights[i].push(Vec::new());
 
                 for _k in 0..self.hidden_neurons {
-                    self.weights[i][j].push(rng.random_range(-0.5..=0.5));
+                    self.weights[i][j].push(rng.random_range(-0.4330..=0.4330));
                 }
             }
         }
@@ -52,7 +52,7 @@ impl NeuralNetwork {
             self.weights[self.hidden_layers].push(Vec::new());
 
             for _j in 0..self.hidden_neurons {
-                self.weights[self.hidden_layers][i].push(rng.random_range(-0.5..=0.5));
+                self.weights[self.hidden_layers][i].push(rng.random_range(-0.480..=0.480));
             }
         }
 
@@ -94,8 +94,9 @@ impl NeuralNetwork {
         let v_output = all_neurons.iter().last().unwrap();
         let mut answ = 0;
         let mut max = 0.0;
+        //println!("{:?}", v_output);
         for i in 0..v_output.len() {
-            if max > v_output[i] {
+            if max < v_output[i] {
                 max = v_output[i];
                 answ = i;
             }
@@ -197,13 +198,13 @@ impl NeuralNetwork {
                     &train_full[i * self.mini_batch_size as usize + j as usize],
                     &mut grad_w,
                     &mut grad_b,
-                );
+                )
             }
-            println!(
-                "Итерация: {} Ошибка: {}",
-                i,
-                c / (self.mini_batch_size as f32)
-            );
+            //println!(
+            //    "Итерация: {} Ошибка: {}",
+            //    i,
+            //    c / (self.mini_batch_size as f32)
+            //);
             //TODO в этом месте нужно слить grad_w*-(lr/mini_batch_size) в weights и grad_b*(-lr/mini_batch_size)
             for k in 0..self.weights.len() {
                 //слои
@@ -248,7 +249,7 @@ fn main() {
         hidden_layers: 2,
         hidden_neurons: 16,
 
-        learning_rate: 0.01,
+        learning_rate: 12.0,
         mini_batch_size: 100,
 
         weights: Vec::new(),
@@ -256,8 +257,29 @@ fn main() {
     };
 
     net1.create();
-    net1.train();
 
+    println!();
+    println!();
+
+    println!("Тест на проверочной выборке до обучения:");
+    let mut counter = 0;
+    for i in 0..test_full.len() {
+        if net1.predict(&test_full[i].0) == test_full[i].1 {
+            counter += 1;
+        }
+    }
+    println!("Проверочный результат: {}/{}", counter, test_full.len());
+    println!(
+        "Accuracy: {:.2}%",
+        100.0 * counter as f32 / test_full.len() as f32
+    );
+
+    net1.train();
+    println!();
+    println!("Обучение завершено!");
+    println!();
+
+    println!("Тест на проверочной выборке:");
     let mut counter = 0;
     for i in 0..test_full.len() {
         if net1.predict(&test_full[i].0) == test_full[i].1 {
@@ -265,7 +287,8 @@ fn main() {
         }
     }
     println!("Финальный результат: {}/{}", counter, test_full.len());
-
-    //Ручной минибатч.
-    //push to git-hub
+    println!(
+        "Accuracy: {:.2}%",
+        100.0 * counter as f32 / test_full.len() as f32
+    );
 }
