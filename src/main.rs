@@ -220,4 +220,5 @@ fn main() {
     net1.create();
 
     //Ручной минибатч.
+    //push to git-hub
 }
