@@ -1,5 +1,5 @@
 /target
 
 # datasets
-MNIST/*.csv
+/MNIST
 MNIST.zip
