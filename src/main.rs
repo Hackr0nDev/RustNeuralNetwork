@@ -76,22 +76,49 @@ impl NeuralNetwork {
         }
     }
 
-    fn predict(
+    fn predict(&self, data: &Vec<f32>) -> u8 {
+        let mut all_neurons: Vec<Vec<f32>> = vec![data.clone()]; // мб клон
+
+        for i in 0..=self.hidden_layers {
+            all_neurons.push(Vec::new());
+            for j in 0..self.biases[i].len() {
+                // нейрон в слое l
+                let mut neuron: f32 = self.biases[i][j];
+                // мы должны взять все веса предыдущего слоя с индексом j(это индекс текущего нейрона)
+                for k in 0..all_neurons[i].len() {
+                    neuron += self.weights[i][j][k] * all_neurons[i][k];
+                }
+                all_neurons[i + 1].push(sigm(neuron));
+            }
+        }
+        let v_output = all_neurons.iter().last().unwrap();
+        let mut answ = 0;
+        let mut max = 0.0;
+        for i in 0..v_output.len() {
+            if max > v_output[i] {
+                max = v_output[i];
+                answ = i;
+            }
+        }
+        answ as u8
+    }
+
+    fn gradient(
         &self,
         data: &(Vec<f32>, u8),
         grad_w: &mut Vec<Vec<Vec<f32>>>,
         grad_b: &mut Vec<Vec<f32>>,
-    ) {
+    ) -> f32 {
         let mut all_neurons: Vec<Vec<f32>> = vec![data.0.clone()]; // мб клон
 
         for i in 0..=self.hidden_layers {
             all_neurons.push(Vec::new());
-            for j in 0..self.biases[i].iter().len() {
+            for j in 0..self.biases[i].len() {
                 // нейрон в слое l
                 let mut neuron: f32 = self.biases[i][j];
                 // мы должны взять все веса предыдущего слоя с индексом j(это индекс текущего нейрона)
-                for k in 0..self.weights[i].iter().len() {
-                    neuron += self.weights[i][k][j] * all_neurons[i][k];
+                for k in 0..all_neurons[i].len() {
+                    neuron += self.weights[i][j][k] * all_neurons[i][k];
                 }
                 all_neurons[i + 1].push(sigm(neuron));
             }
@@ -101,17 +128,11 @@ impl NeuralNetwork {
 
         let mut guilt_vec: Vec<f32> = vec![];
 
-        for i in 0..10 {
-            if i != data.1 {
-                guilt_vec.push(
-                    v_output[i as usize] * v_output[i as usize] * (1.0 - v_output[i as usize]),
-                );
+        for i in 0..self.output_neurons {
+            if i != data.1.into() {
+                guilt_vec.push(v_output[i] * v_output[i] * (1.0 - v_output[i]));
             } else {
-                guilt_vec.push(
-                    (v_output[i as usize] - 1.0)
-                        * v_output[i as usize]
-                        * (1.0 - v_output[i as usize]),
-                )
+                guilt_vec.push((v_output[i] - 1.0) * v_output[i] * (1.0 - v_output[i]))
             }
         }
 
@@ -144,13 +165,12 @@ impl NeuralNetwork {
             }
             guilt_vec = new_guilt;
         }
+        c
     }
 
     fn train(&mut self) {
-        let mut train_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_train.csv", false)
+        let train_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_train.csv", true)
             .expect("Наебнулось что то в train_full");
-        //let _test_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_test.csv", false)
-        //    .expect("Наебнулось что то в train_full");
         let q = -self.learning_rate / self.mini_batch_size as f32;
 
         for i in 0..train_full.len() / self.mini_batch_size as usize {
@@ -169,24 +189,27 @@ impl NeuralNetwork {
                     grad_b[j][k] = 0.0;
                 }
             }
-            train_full = data::load_mnist_csv("MNIST/mnist_train.csv", true)
-                .expect("Наебнулось что то в train_full"); // Чтоб оно там шафлилось.
 
             //Начинаем итерироваться по минибатчу и ему туда передаем эти градиенты.
-            for j in 0..10 {
-                //self.mini_batch_size {
-                self.predict(
-                    &train_full[(j as usize * (i as usize + 1) as usize) as usize],
+            let mut c: f32 = 0.0;
+            for j in 0..self.mini_batch_size {
+                c += self.gradient(
+                    &train_full[i * self.mini_batch_size as usize + j as usize],
                     &mut grad_w,
                     &mut grad_b,
                 );
             }
+            println!(
+                "Итерация: {} Ошибка: {}",
+                i,
+                c / (self.mini_batch_size as f32)
+            );
             //TODO в этом месте нужно слить grad_w*-(lr/mini_batch_size) в weights и grad_b*(-lr/mini_batch_size)
             for k in 0..self.weights.len() {
                 //слои
-                for n in 0..self.weights[i].len() {
+                for n in 0..self.weights[k].len() {
                     //нейроны
-                    for l in 0..self.weights[i][n].len() {
+                    for l in 0..self.weights[k][n].len() {
                         // веса
                         self.weights[k][n][l] += grad_w[k][n][l] * q;
                     }
@@ -215,6 +238,9 @@ fn f_cost(output_vec: Vec<f32>, answ: u8) -> f32 {
 }
 
 fn main() {
+    let test_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_test.csv", false)
+        .expect("Наебнулось что то в train_full");
+
     let mut net1 = NeuralNetwork {
         input_neurons: 784,
         output_neurons: 10,
@@ -231,6 +257,14 @@ fn main() {
 
     net1.create();
     net1.train();
+
+    let mut counter = 0;
+    for i in 0..test_full.len() {
+        if net1.predict(&test_full[i].0) == test_full[i].1 {
+            counter += 1;
+        }
+    }
+    println!("Финальный результат: {}/{}", counter, test_full.len());
 
     //Ручной минибатч.
     //push to git-hub
