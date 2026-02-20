@@ -1,12 +1,10 @@
 use rand::{rng, RngExt};
-use std::f32::consts::E;
+use std::{f32::consts::E, usize};
 mod data;
 use data::{load_mnist_csv, Sample};
 
 #[derive(Debug)]
 struct NeuralNetwork {
-    //stohastic_gradient_weights: Vec<Vec<Vec<f32>>>,
-    //stohastic_gradient_biases: Vec<Vec<f32>>,
     weights: Vec<Vec<Vec<f32>>>,
     biases: Vec<Vec<f32>>,
 
@@ -79,11 +77,13 @@ impl NeuralNetwork {
         }
     }
 
-    //Супер неоптимизированная залупа.
-    fn predict(&self, data: (Vec<f32>, u8)) -> Vec<Vec<f32>> {
-        //TODO Push forward algorythm!
-
-        let mut all_neurons: Vec<Vec<f32>> = vec![data.0];
+    fn predict(
+        &self,
+        data: &(Vec<f32>, u8),
+        grad_w: &mut Vec<Vec<Vec<f32>>>,
+        grad_b: &mut Vec<Vec<f32>>,
+    ) {
+        let mut all_neurons: Vec<Vec<f32>> = vec![data.0]; // мб клон
 
         for i in 0..=self.hidden_layers {
             all_neurons.push(Vec::new());
@@ -98,11 +98,79 @@ impl NeuralNetwork {
             }
         }
         let v_output = all_neurons.iter().last().unwrap();
-        println!("Выходной слой нейронов: {:?}", v_output);
-        println!();
-        println!("Cost function: {}", f_cost(v_output.to_vec(), data.1));
+        let c = f_cost(v_output.to_vec(), data.1); // локальная функция ошибки;
 
-        all_neurons
+        //TODO не забыть потом высчитывать С для сравнения точности. (Глобальное С)
+        //TODO На основе локального с мы должны вычислить текущий градиент
+
+        //                         δ^L
+        let mut gradient: Vec<f32> = vec![];
+
+        for i in 0..10 {
+            if i != data.1 {
+                gradient.push(
+                    v_output[i as usize] * v_output[i as usize] * (1.0 - v_output[i as usize]),
+                );
+            } else {
+                gradient.push(
+                    (v_output[i as usize] - 1.0)
+                        * v_output[i as usize]
+                        * (1.0 - v_output[i as usize]),
+                )
+            }
+        }
+
+        //      ВЕЛИКАЯ ПРОБЛЕММА: НАХУЯ Я КАЖДЫЙ РАЗ ПЕРЕСОЗДАЮ ГРАДИЕНТ????
+        //      ГРАДИЕНТ W,B ДОЛЖНЫ ПЕРЕДАВАТЬСЯ(СОЗДАВАТЬСЯ) В НАЧАЛЕ МИНИБАТЧА.
+
+        //TODO работаем с δ^L
+
+        grad_w.push(Vec::new()); // Добавили СЛОЙ
+        grad_b.push(Vec::new());
+        for i in 0..gradient.len() {
+            grad_w[i].push(Vec::new());
+            for j in 0..all_neurons[all_neurons.len() - 2].len() {
+                grad_w[i][j].push(gradient[i] * all_neurons[all_neurons.len() - 2][j]);
+            }
+            grad_b[i].push(gradient[i]);
+        }
+    }
+
+    fn train(&self) {
+        let mut train_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_train.csv", true)
+            .expect("Наебнулось что то в train_full");
+        //let _test_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_test.csv", false)
+        //    .expect("Наебнулось что то в train_full");
+
+        for i in 0..train_full.len() / self.mini_batch_size as usize {
+            //Создаем градиенты W, B
+            let mut grad_w: Vec<Vec<Vec<f32>>> = self.weights.clone();
+            for j in 0..grad_w.len() {
+                for k in 0..grad_w[i].len() {
+                    for h in 0..grad_w[i][j].len() {
+                        grad_w[j][k][h] = 0.0;
+                    }
+                }
+            }
+            let mut grad_b: Vec<Vec<f32>> = self.biases.clone();
+            for j in 0..grad_b.len() {
+                for k in 0..grad_b[j].len() {
+                    grad_b[j][k] = 0.0;
+                }
+            }
+            train_full = data::load_mnist_csv("MNIST/mnist_train.csv", true)
+                .expect("Наебнулось что то в train_full"); // Чтоб оно там шафлилось.
+
+            //Начинаем итерироваться по минибатчу и ему туда передаем эти градиенты.
+            for j in 0..self.mini_batch_size {
+                self.predict(
+                    &train_full[(j as usize * (i + 1) as usize) as usize],
+                    &mut grad_w,
+                    &mut grad_b,
+                );
+            }
+            //TODO в этом месте нужно слить grad_w*-(lr/mini_batch_size) в weights и grad_b*(-lr/mini_batch_size)
+        }
     }
 }
 
@@ -111,24 +179,19 @@ fn sigm(z: f32) -> f32 {
 }
 
 fn f_cost(output_vec: Vec<f32>, answ: u8) -> f32 {
-    let mut c: f32 = 0.0;
+    let mut temp_c: f32 = 0.0;
 
     for i in 0..10 {
         if i != answ {
-            c += output_vec[i as usize] * output_vec[i as usize];
+            temp_c += output_vec[i as usize] * output_vec[i as usize];
         } else {
-            c += (1.0 - output_vec[i as usize]) * (1.0 - output_vec[i as usize]);
+            temp_c += (1.0 - output_vec[i as usize]) * (1.0 - output_vec[i as usize]);
         }
     }
-    c / 2.0
+    temp_c / 2.0
 }
 
 fn main() {
-    let mut train_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_train.csv", true)
-        .expect("Наебнулось что то в train_full");
-    let test_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_test.csv", false)
-        .expect("Наебнулось что то в train_full");
-
     let mut net1 = NeuralNetwork {
         input_neurons: 784,
         output_neurons: 10,
@@ -145,24 +208,5 @@ fn main() {
 
     net1.create();
 
-    //println!(
-    //    "кол-во входных нейронов: {},
-    //    кол-во выходных нейронов: {},
-    //    кол-во скрытых слоев: {},
-    //    кол-во скрытых нейронов в каждом слое: {},
-    //    функция активации - sigmoida,
-    //    ====================================",
-    //    net1.input_neurons, net1.output_neurons, net1.hidden_layers, net1.hidden_neurons
-    //);
-    //
-    ////println!("веса: {:?}", net1.weights);
-    ////println!();
-    ////println!("смещения: {:?}", net1.biases);
-    ////println!();
-    //let mut inp_vec: Vec<f32> = vec![];
-    //for _i in 0..net1.input_neurons {
-    //    inp_vec.push(rng().random_range(0.0..=1.0));
-    //}
-
-    net1.predict(train_full[0].clone());
+    //Ручной минибатч.
 }
