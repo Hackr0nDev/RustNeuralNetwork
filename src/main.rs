@@ -1,7 +1,7 @@
-use rand::{rng, RngExt};
-use std::{f32::consts::E, process::exit, usize};
+use rand::RngExt;
+use std::f32::consts::E;
 mod data;
-use data::{load_mnist_csv, Sample};
+use data::Sample;
 
 #[derive(Debug)]
 struct NeuralNetwork {
@@ -192,9 +192,9 @@ impl NeuralNetwork {
             }
 
             //Начинаем итерироваться по минибатчу и ему туда передаем эти градиенты.
-            let mut c: f32 = 0.0;
+            let mut _c: f32 = 0.0;
             for j in 0..self.mini_batch_size {
-                c += self.gradient(
+                _c += self.gradient(
                     &train_full[i * self.mini_batch_size as usize + j as usize],
                     &mut grad_w,
                     &mut grad_b,
@@ -274,7 +274,9 @@ fn main() {
         100.0 * counter as f32 / test_full.len() as f32
     );
 
-    net1.train();
+    for i in 0..10 {
+        net1.train();
+    }
     println!();
     println!("Обучение завершено!");
     println!();
