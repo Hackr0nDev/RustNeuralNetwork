@@ -173,6 +173,7 @@ impl NeuralNetwork {
         let train_full: Vec<Sample> = data::load_mnist_csv("MNIST/mnist_train.csv", true)
             .expect("Наебнулось что то в train_full");
         let q = -self.learning_rate / self.mini_batch_size as f32;
+        let mut _c: f32 = 0.0;
 
         for i in 0..train_full.len() / self.mini_batch_size as usize {
             //Создаем градиенты W, B
@@ -192,7 +193,7 @@ impl NeuralNetwork {
             }
 
             //Начинаем итерироваться по минибатчу и ему туда передаем эти градиенты.
-            let mut _c: f32 = 0.0;
+            _c = 0.0;
             for j in 0..self.mini_batch_size {
                 _c += self.gradient(
                     &train_full[i * self.mini_batch_size as usize + j as usize],
@@ -246,11 +247,11 @@ fn main() {
         input_neurons: 784,
         output_neurons: 10,
 
-        hidden_layers: 2,
-        hidden_neurons: 16,
+        hidden_layers: 2,   //С этим параметром можно играться.
+        hidden_neurons: 16, //С этим параметром можно играться.
 
-        learning_rate: 12.0,
-        mini_batch_size: 100,
+        learning_rate: 12.0,  //С этим параметром можно играться.
+        mini_batch_size: 100, //С этим параметром можно играться.
 
         weights: Vec::new(),
         biases: Vec::new(),
@@ -274,9 +275,11 @@ fn main() {
         100.0 * counter as f32 / test_full.len() as f32
     );
 
-    for i in 0..10 {
+    for _i in 0..3 {
+        // Тут менять - сколько итераций обучения. 10 _i - (95.10)%
         net1.train();
     }
+
     println!();
     println!("Обучение завершено!");
     println!();
